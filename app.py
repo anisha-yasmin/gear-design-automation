@@ -1,40 +1,51 @@
 import streamlit as st
 import numpy as np
+import plotly.graph_objects as go
+from src.geometry import calculate_gear_parameters, generate_involute_points
+from src.stress_analysis import analyze_gear_stresses
+from src.kinematics import optimize_gear_pair
 
-# A simplified, self-contained version of your gear math for the web app
-st.set_page_config(page_title="Gear Optimizer", layout="centered")
+st.set_page_config(page_title="Parametric Gear Optimizer", layout="centered")
 
-st.title("Parametric Gear Optimizer")
-st.write("This app runs a live optimization loop to find the lightest gear pair that safely handles your input torque.")
+st.title("Parametric Gear Design & Structural Optimizer")
+st.write("This app runs a live optimization loop using your backend scripts to find the lightest gear configuration.")
 
-# --- Sliders on the sidebar ---
+# Sidebar Inputs
 st.sidebar.header("Design Requirements")
 target_ratio = st.sidebar.slider("Target Gear Ratio", 1.5, 4.0, 2.0, 0.1)
 input_torque = st.sidebar.slider("Input Torque (Nm)", 10, 500, 120, 10)
-material = st.sidebar.selectbox("Material Yield Strength", ["Steel (250 MPa)", "Alloy Steel (400 MPa)"])
+material_yield = st.sidebar.selectbox("Material Yield Strength", 
+                                      options=[250.0, 400.0], 
+                                      format_func=lambda x: f"Steel ({int(x)} MPa)")
 
-yield_strength = 250.0 if "250" in material else 400.0
-
-# --- The Optimization Loop ---
+#Triggering the Optimization Loop
 if st.sidebar.button("Optimize Gear Train"):
-    allowable_stress = yield_strength / 1.5
-    best_module = 2.5
-    best_N1 = int(round(10 * target_ratio))
-    best_N2 = int(round(best_N1 * target_ratio))
+    # Call the optimization function from kinematics.py
+    result = optimize_gear_pair(target_ratio, input_torque, material_yield)
     
-    # Calculate dummy stresses for visual demonstration based on inputs
-    calculated_bending = (input_torque * 1.2) / (target_ratio)
-    calculated_contact = (input_torque * 1.4) / (target_ratio)
-    
-    if calculated_bending > allowable_stress:
-        st.error("Stresses exceed material limits! Try a stronger material or lower torque.")
-    else:
+    if result:
         st.subheader("Optimal Design Configuration")
         
-        # Display results in columns
+        # Display the real calculated metrics in clean columns
         col1, col2, col3 = st.columns(3)
-        col1.metric("Module", f"{best_module} mm")
-        col2.metric("Pinion Teeth (N1)", best_N1)
-        col3.metric("Gear Teeth (N2)", best_N2)
+        col1.metric("Module", f"{result['Module']} mm")
+        col2.metric("Pinion Teeth (N1)", int(result['Pinion Teeth (N1)']))
+        col4.metric("Face Width", f"{result['Face Width (mm)']} mm")
         
-        st.success(f"Bending Stress: {calculated_bending:.1f} MPa (Safe limit: {allowable_stress:.1f} MPa)")
+        st.success(f"Bending Stress: {result['Bending Stress (MPa)']:.1f} MPa")
+        st.success(f"Contact Stress: {result['Contact Stress (MPa)']:.1f} MPa")
+        
+        # Plot the exact geometry from geometry.py
+        st.subheader("Mathematically Generated Tooth Profile")
+        
+        rb, rp, ra, rd = calculate_gear_parameters(result['Module'], result['Pinion Teeth (N1)'], 20.0)
+        x_pts, y_pts = generate_involute_points(rb, ra)
+        
+        # Draw an interactive graph
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=x_pts, y=y_pts, mode='lines+markers', line=dict(color='#FF4B4B', width=3)))
+        fig.update_layout(xaxis_title="X (mm)", yaxis_title="Y (mm)", template="plotly_white", showlegend=False)
+        st.plotly_chart(fig)
+        
+    else:
+        st.error("No safe design configuration fits within these boundaries. Try increasing material specifications.")
