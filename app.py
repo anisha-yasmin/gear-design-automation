@@ -84,7 +84,7 @@ if execute:
         st.plotly_chart(fig_2d, use_container_width=True)
         
         # --- GRAPH 2: INTERACTIVE 3D EXTRUSION ---
-        st.markdown("### 3D Parametric CAD Generation")
+        st.markdown("### 📦 3D Parametric CAD Generation")
         st.write("Drag to rotate, scroll to zoom. This model displays your exact face width dimensional extrusion.")
         
         m = result['Module']
@@ -93,50 +93,38 @@ if execute:
         rb, rp, ra, rd = calculate_gear_parameters(m, N, 20.0)
         x_face, y_face = generate_involute_points(rb, ra)
         
-        # Build unified continuous tooth profile for a single tooth
-        pitch_angle = (np.pi * m) / (2 * rp)
-        t_pitch = np.sqrt(max((rp / rb)**2 - 1, 0))
-        inv_pitch_angle = np.arctan(t_pitch) - t_pitch
-        theta_offset = pitch_angle - 2 * inv_pitch_angle
-        
-        x_side2 = x_face * np.cos(theta_offset) + y_face * np.sin(theta_offset)
-        y_side2 = -x_face * np.sin(theta_offset) + y_face * np.cos(theta_offset)
-        
-        # Flatten everything to 1D standard lists to ensure identical structures
-        x_f = [float(x) for x in x_face.flatten()]
-        y_f = [float(y) for y in y_face.flatten()]
-        x_s = [float(x) for x in x_side2.flatten()][::-1]
-        y_s = [float(y) for y in y_side2.flatten()][::-1]
-        
-        # Combine using standard list addition (Guarantees identical 1:1 array lengths)
-        x_tooth_list = [x_f] + x_f + x_s + [x_s[-1]]
-        y_tooth_list = [float(rd)] + y_f + y_s + [float(rd)]
-        
-        x_tooth_base = np.array(x_tooth_list, dtype=np.float64)
-        y_tooth_base = np.array(y_tooth_list, dtype=np.float64)
-        
-        # Generate full 2D profile coordinates around the circle
-        x_profile_2d = []
-        y_profile_2d = []
+        # Build the full 2D tooth boundary array directly from the work you already did
+        x_pts_2d = []
+        y_pts_2d = []
         for i in range(N):
             beta = (2 * np.pi * i) / N
+            x_rot = x_face * np.cos(beta) - y_face * np.sin(beta)
+            y_rot = x_face * np.sin(beta) + y_face * np.cos(beta)
+            x_pts_2d.extend(x_rot)
+            y_pts_2d.extend(y_rot)
             
+        # Extrude along the Z-axis by building a 2D grid matrix
+        z_range = np.linspace(0, b, 10)
+        
+        # Create the 3D surface mesh matrices
+        X_matrix = np.outer(np.array(x_pts_2d), np.ones_like(z_range))
+        Y_matrix = np.outer(np.array(y_pts_2d), np.ones_like(z_range))
+        Z_matrix = np.outer(np.ones_like(x_pts_2d), z_range)
+        
         fig_3d = go.Figure()
         
-        # Add the solid surface mesh
-        fig_3d.add_trace(go.Mesh3d(
-            x=x_vertices, y=y_vertices, z=z_vertices,
-            i=i_indices, j=j_indices, k=k_indices,
-            color='#1E88E5',
-            opacity=0.9,
-            name='Solid Gear Body',
-            flatshading=True
+        # Add the solid extruded gear surface
+        fig_3d.add_trace(go.Surface(
+            x=X_matrix, y=Y_matrix, z=Z_matrix,
+            colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
+            showscale=False,
+            opacity=0.95,
+            name="Solid Gear Outer Skin"
         ))
         
-        # Add crisp edge outlines on front and back faces to look like clear CAD boundaries
-        angles = np.linspace(0, 2 * np.pi, 250)
-        fig_3d.add_trace(go.Scatter3d(x=x_profile_2d, y=y_profile_2d, z=np.zeros(num_pts), mode='lines', line=dict(color='black', width=2), name='Front Edge Profile'))
-        fig_3d.add_trace(go.Scatter3d(x=x_profile_2d, y=y_profile_2d, z=np.full(num_pts, b), mode='lines', line=dict(color='black', width=2), name='Rear Edge Profile'))
+        # Add crisp front and back wireframes so the silhouette looks completely sharp
+        fig_3d.add_trace(go.Scatter3d(x=x_pts_2d, y=y_pts_2d, z=np.zeros_like(x_pts_2d), mode='lines', line=dict(color='black', width=2), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=x_pts_2d, y=y_pts_2d, z=np.full_like(x_pts_2d, b), mode='lines', line=dict(color='black', width=2), showlegend=False))
         
         fig_3d.update_layout(
             template="plotly_white",
@@ -146,7 +134,7 @@ if execute:
                 yaxis_title="Y (mm)",
                 zaxis_title="Z (Width mm)",
                 aspectmode='data',
-                camera=dict(eye=dict(x=1.25, y=1.25, z=1.25))
+                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
             )
         )
         st.plotly_chart(fig_3d, use_container_width=True)
