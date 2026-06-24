@@ -57,30 +57,16 @@ if execute:
         x_side1, y_side1 = generate_involute_points(rb, ra)
         
         # 2. Mirror profile mathematically to create a solid tooth thickness
-        # Tooth thickness at pitch circle = (pi * m) / 2
         pitch_angle = (np.pi * m) / (2 * rp)
-        
-        # Find the angle of the involute point crossing the pitch circle to properly align mirrored face
         t_pitch = np.sqrt(max((rp / rb)**2 - 1, 0))
         inv_pitch_angle = np.arctan(t_pitch) - t_pitch
-        
-        # Apply thickness offset shift
         theta_offset = pitch_angle - 2 * inv_pitch_angle
         
         x_side2 = x_side1 * np.cos(theta_offset) + y_side1 * np.sin(theta_offset)
         y_side2 = -x_side1 * np.sin(theta_offset) + y_side1 * np.cos(theta_offset)
         
-        # Reverse side 2 array direction so coordinates form a continuous outer loop contour path
+        # Reverse side 2 so the coordinates flow continuously from root to tip, then tip to root
         x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
-        
-        # Combine faces to form one closed single tooth crown profile contour boundary
-        x_tooth = np.insert(x_side1, 0, 0)
-        x_tooth = np.append(x_tooth, x_side2)
-        x_tooth = np.append(x_tooth, 0)
-
-        y_tooth = np.insert(y_side1, 0, rd)
-        y_tooth = np.append(y_tooth, y_side2)
-        y_tooth = np.append(y_tooth, rd)
         
         fig = go.Figure()
         
@@ -90,19 +76,41 @@ if execute:
         fig.add_trace(go.Scatter(x=rb * np.cos(angles), y=rb * np.sin(angles), mode='lines', name='Base Circle', line=dict(color='gray', dash='dot'), hovertemplate="Base Radius: %{x:.2f} mm<extra></extra>"))
         fig.add_trace(go.Scatter(x=rd * np.cos(angles), y=rd * np.sin(angles), mode='lines', name='Dedendum (Root)', line=dict(color='purple', dash='solid', width=1), hovertemplate="Root Radius: %{x:.2f} mm<extra></extra>"))
         
-        # Accumulate all coordinate sequences to generate a unified solid fill region geometry map
+        # Accumulate coordinate sequences to generate a unified outer boundary loop
         x_full_gear = []
         y_full_gear = []
         
         for i in range(N):
             beta = (2 * np.pi * i) / N
-            x_rot = x_tooth * np.cos(beta) - y_tooth * np.sin(beta)
-            y_rot = x_tooth * np.sin(beta) + y_tooth * np.cos(beta)
             
-            x_full_gear.extend(x_rot)
-            y_full_gear.extend(y_rot)
+            # Rotate side 1 (up the tooth)
+            x_rot1 = x_side1 * np.cos(beta) - y_side1 * np.sin(beta)
+            y_rot1 = x_side1 * np.sin(beta) + y_side1 * np.cos(beta)
             
-        # Draw the complete structural solid gear polygon asset
+            # Rotate side 2 (down the tooth)
+            x_rot2 = x_side2 * np.cos(beta) - y_side2 * np.sin(beta)
+            y_rot2 = x_side2 * np.sin(beta) + y_side2 * np.cos(beta)
+            
+            # Append the profile points sequentially to keep the path unbroken
+            x_full_gear.extend(x_rot1)
+            y_full_gear.extend(y_rot1)
+            x_full_gear.extend(x_rot2)
+            y_full_gear.extend(y_rot2)
+            
+            # Calculate the start of the NEXT tooth to draw a clean bottom root land curve
+            beta_next = (2 * np.pi * (i + 1)) / N
+            x_next_start = x_side1 * np.cos(beta_next) - y_side1 * np.sin(beta_next)
+            y_next_start = x_side1 * np.sin(beta_next) + y_side1 * np.cos(beta_next)
+            
+            # Connect the bottom of this tooth to the start of the next tooth along the root radius
+            x_full_gear.append(x_next_start)
+            y_full_gear.append(y_next_start)
+            
+        # Close the entire polygon loop by linking the final point back to the very first point
+        x_full_gear.append(x_full_gear)
+        y_full_gear.append(y_full_gear)
+        
+        # Draw the complete structural solid gear polygon
         fig.add_trace(go.Scatter(
             x=x_full_gear, y=y_full_gear, 
             fill="toself", 
