@@ -53,7 +53,7 @@ if execute:
         
         # Display the exact structural specifications in a clean table view
         st.markdown(f"""
-        | Reference Boundary | Radius Specification | Diameter Specification |
+        | Reference Boundary | Radius | Diameter |
         | :--- | :--- | :--- |
         | **Outer Tip (Addendum)** | {ra:.2f} mm | {2*ra:.2f} mm |
         | **Pitch Circle** | {rp:.2f} mm | {2*rp:.2f} mm |
