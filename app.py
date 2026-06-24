@@ -74,8 +74,8 @@ if execute:
         x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
         
         # Combine faces to form one closed single tooth crown profile contour boundary
-        x_tooth = np.concatenate([, x_side1, x_side2,])
-        y_tooth = np.concatenate([[rd], y_side1, y_side2, [rd]])
+        x_tooth = np.concatenate((, x_side1, x_side2,))
+        y_tooth = np.concatenate(([rd], y_side1, y_side2, [rd]))
         
         fig = go.Figure()
         
