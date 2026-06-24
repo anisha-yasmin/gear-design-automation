@@ -8,8 +8,8 @@ from kinematics import optimize_gear_pair
 
 st.set_page_config(page_title="Gear Synthesis Suite", layout="centered")
 
-st.title("Parametric Gear Synthesis & Optimization Suite")
-st.markdown("Automated AGMA structural optimization and full-profile geometric generation.")
+st.title("Parametric Gear Design & Optimization Suite")
+st.markdown("Automated AGMA structural optimization and high-fidelity profile generation.")
 st.markdown("---")
 
 st.subheader("Design Constraints")
@@ -29,84 +29,89 @@ if execute:
     if result:
         st.subheader("Optimized Parameters")
         
-        st.write(f"**Module:** {result['Module']} mm")
-        st.write(f"**Pinion Teeth (N1):** {int(result['Pinion Teeth (N1)'])}")
-        st.write(f"**Face Width:** {result['Face Width (mm)']} mm")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Module", f"{result['Module']} mm")
+        col2.metric("Pinion Teeth (N1)", int(result['Pinion Teeth (N1)']))
+        col3.metric("Face Width", f"{result['Face Width (mm)']} mm")
         
         st.markdown("### Structural Margins")
         st.info(f"Root Bending Stress: **{result['Bending Stress (MPa)']:.1f} MPa**")
         st.info(f"Hertzian Contact Stress: **{result['Contact Stress (MPa)']:.1f} MPa**")
         
-        st.markdown("### Interactive Full Gear Geometry Visualizer")
+        st.markdown("### High-Fidelity Geometry Synthesis")
         
         m = result['Module']
         N = int(result['Pinion Teeth (N1)'])
         rb, rp, ra, rd = calculate_gear_parameters(m, N, 20.0)
         
-        x_face, y_face = generate_involute_points(rb, ra)
-        
-        st.subheader("Interactive Full Gear Geometry Visualizer")
-        
-        m = result['Module']
-        N = int(result['Pinion Teeth (N1)'])
-        rb, rp, ra, rd = calculate_gear_parameters(m, N, 20.0)
-        
-        # Display the exact structural specifications in a clean table view
         st.markdown(f"""
         | Reference Boundary | Radius | Diameter |
         | :--- | :--- | :--- |
         | **Outer Tip (Addendum)** | {ra:.2f} mm | {2*ra:.2f} mm |
         | **Pitch Circle** | {rp:.2f} mm | {2*rp:.2f} mm |
         | **Base Circle** | {rb:.2f} mm | {2*rb:.2f} mm |
-        | **Root (Dedendum)** | {rd:.2f} mm | {2*rd:.2f} mm |
+        | **Root Land (Dedendum)** | {rd:.2f} mm | {2*rd:.2f} mm |
         """)
         
-        x_face, y_face = generate_involute_points(rb, ra)
+        # 1. Generate primary side of a single tooth profile
+        x_side1, y_side1 = generate_involute_points(rb, ra)
+        
+        # 2. Mirror profile mathematically to create a solid tooth thickness
+        # Tooth thickness at pitch circle = (pi * m) / 2
+        pitch_angle = (np.pi * m) / (2 * rp)
+        
+        # Find the angle of the involute point crossing the pitch circle to properly align mirrored face
+        t_pitch = np.sqrt(max((rp / rb)**2 - 1, 0))
+        inv_pitch_angle = np.arctan(t_pitch) - t_pitch
+        
+        # Apply thickness offset shift
+        theta_offset = pitch_angle - 2 * inv_pitch_angle
+        
+        x_side2 = x_side1 * np.cos(theta_offset) + y_side1 * np.sin(theta_offset)
+        y_side2 = -x_side1 * np.sin(theta_offset) + y_side1 * np.cos(theta_offset)
+        
+        # Reverse side 2 array direction so coordinates form a continuous outer loop contour path
+        x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
+        
+        # Combine faces to form one closed single tooth crown profile contour boundary
+        x_tooth = np.concatenate([, x_side1, x_side2,])
+        y_tooth = np.concatenate([[rd], y_side1, y_side2, [rd]])
         
         fig = go.Figure()
         
-        # Reference circles with explicit hover templates
-        angles = np.linspace(0, 2 * np.pi, 200)
+        # Render clean reference circles background layers
+        angles = np.linspace(0, 2 * np.pi, 250)
+        fig.add_trace(go.Scatter(x=rp * np.cos(angles), y=rp * np.sin(angles), mode='lines', name='Pitch Circle', line=dict(color='orange', dash='dash'), hovertemplate="Pitch Radius: %{x:.2f} mm<extra></extra>"))
+        fig.add_trace(go.Scatter(x=rb * np.cos(angles), y=rb * np.sin(angles), mode='lines', name='Base Circle', line=dict(color='gray', dash='dot'), hovertemplate="Base Radius: %{x:.2f} mm<extra></extra>"))
+        fig.add_trace(go.Scatter(x=rd * np.cos(angles), y=rd * np.sin(angles), mode='lines', name='Dedendum (Root)', line=dict(color='purple', dash='solid', width=1), hovertemplate="Root Radius: %{x:.2f} mm<extra></extra>"))
         
-        fig.add_trace(go.Scatter(
-            x=rp * np.cos(angles), y=rp * np.sin(angles), 
-            mode='lines', name='Pitch Circle', 
-            line=dict(color='orange', dash='dash'),
-            hovertemplate=f"Pitch Radius: {rp:.2f} mm<extra></extra>"
-        ))
+        # Accumulate all coordinate sequences to generate a unified solid fill region geometry map
+        x_full_gear = []
+        y_full_gear = []
         
-        fig.add_trace(go.Scatter(
-            x=rb * np.cos(angles), y=rb * np.sin(angles), 
-            mode='lines', name='Base Circle', 
-            line=dict(color='gray', dash='dot'),
-            hovertemplate=f"Base Radius: {rb:.2f} mm<extra></extra>"
-        ))
-        
-        fig.add_trace(go.Scatter(
-            x=ra * np.cos(angles), y=ra * np.sin(angles), 
-            mode='lines', name='Addendum (Tip)', 
-            line=dict(color='red', width=1),
-            hovertemplate=f"Outer Radius: {ra:.2f} mm<extra></extra>"
-        ))
-        
-        # Generate and rotate teeth profiles
         for i in range(N):
             beta = (2 * np.pi * i) / N
-            x_rot = x_face * np.cos(beta) - y_face * np.sin(beta)
-            y_rot = x_face * np.sin(beta) + y_face * np.cos(beta)
+            x_rot = x_tooth * np.cos(beta) - y_tooth * np.sin(beta)
+            y_rot = x_tooth * np.sin(beta) + y_tooth * np.cos(beta)
             
-            fig.add_trace(go.Scatter(
-                x=x_rot, y=y_rot, mode='lines', 
-                line=dict(color='#1E88E5', width=1.5), 
-                showlegend=False,
-                hoverinfo='skip' # Keeps the chart clean when hovering over individual teeth faces
-            ))
+            x_full_gear.extend(x_rot)
+            y_full_gear.extend(y_rot)
+            
+        # Draw the complete structural solid gear polygon asset
+        fig.add_trace(go.Scatter(
+            x=x_full_gear, y=y_full_gear, 
+            fill="toself", 
+            fillcolor="rgba(30, 136, 229, 0.2)", 
+            line=dict(color='#1E88E5', width=2), 
+            name='Solid Gear Blank Profile',
+            hoverinfo='skip'
+        ))
         
         fig.update_layout(
-            xaxis=dict(title="X Coordinate (mm)", scaleanchor="y", scaleratio=1),
-            yaxis=dict(title="Y Coordinate (mm)"),
+            xaxis=dict(title="X Axis Coordinate (mm)", scaleanchor="y", scaleratio=1, gridcolor='rgba(0,0,0,0.05)'),
+            yaxis=dict(title="Y Axis Coordinate (mm)", gridcolor='rgba(0,0,0,0.05)'),
             template="plotly_white",
-            height=600,
+            height=650,
             legend=dict(yanchor="top", y=0.99, xanchor="left", x=0.01)
         )
         st.plotly_chart(fig, use_container_width=True)
