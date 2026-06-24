@@ -110,9 +110,14 @@ if execute:
         x_s = x_side2.flatten()
         y_s = y_side2.flatten()
         
-        # Build the exact continuous profile path arrays
-        x_tooth_base = np.concatenate(([x_f], x_f, x_s, [x_s[-1]]))
-        y_tooth_base = np.concatenate(([rd], y_f, y_s, [rd]))
+        # Build the exact continuous profile path sequentially
+        x_tooth_base = np.append(x_f, x_f)
+        x_tooth_base = np.append(x_tooth_base, x_s)
+        x_tooth_base = np.append(x_tooth_base, x_s[-1])
+        
+        y_tooth_base = np.append(rd, y_f)
+        y_tooth_base = np.append(y_tooth_base, y_s)
+        y_tooth_base = np.append(y_tooth_base, rd)
         
         # Generate full 2D profile coordinates around the circle
         x_profile_2d = []
