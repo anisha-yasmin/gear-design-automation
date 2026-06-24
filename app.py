@@ -45,20 +45,62 @@ if execute:
         
         x_face, y_face = generate_involute_points(rb, ra)
         
+        st.subheader("Interactive Full Gear Geometry Visualizer")
+        
+        m = result['Module']
+        N = int(result['Pinion Teeth (N1)'])
+        rb, rp, ra, rd = calculate_gear_parameters(m, N, 20.0)
+        
+        # Display the exact structural specifications in a clean table view
+        st.markdown(f"""
+        | Reference Boundary | Radius Specification | Diameter Specification |
+        | :--- | :--- | :--- |
+        | **Outer Tip (Addendum)** | {ra:.2f} mm | {2*ra:.2f} mm |
+        | **Pitch Circle** | {rp:.2f} mm | {2*rp:.2f} mm |
+        | **Base Circle** | {rb:.2f} mm | {2*rb:.2f} mm |
+        | **Root (Dedendum)** | {rd:.2f} mm | {2*rd:.2f} mm |
+        """)
+        
+        x_face, y_face = generate_involute_points(rb, ra)
+        
         fig = go.Figure()
         
+        # Reference circles with explicit hover templates
         angles = np.linspace(0, 2 * np.pi, 200)
-        fig.add_trace(go.Scatter(x=rp * np.cos(angles), y=rp * np.sin(angles), mode='lines', name='Pitch Circle', line=dict(color='orange', dash='dash')))
-        fig.add_trace(go.Scatter(x=rb * np.cos(angles), y=rb * np.sin(angles), mode='lines', name='Base Circle', line=dict(color='gray', dash='dot')))
-        fig.add_trace(go.Scatter(x=ra * np.cos(angles), y=ra * np.sin(angles), mode='lines', name='Addendum (Tip)', line=dict(color='red', width=1)))
         
+        fig.add_trace(go.Scatter(
+            x=rp * np.cos(angles), y=rp * np.sin(angles), 
+            mode='lines', name='Pitch Circle', 
+            line=dict(color='orange', dash='dash'),
+            hovertemplate=f"Pitch Radius: {rp:.2f} mm<extra></extra>"
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=rb * np.cos(angles), y=rb * np.sin(angles), 
+            mode='lines', name='Base Circle', 
+            line=dict(color='gray', dash='dot'),
+            hovertemplate=f"Base Radius: {rb:.2f} mm<extra></extra>"
+        ))
+        
+        fig.add_trace(go.Scatter(
+            x=ra * np.cos(angles), y=ra * np.sin(angles), 
+            mode='lines', name='Addendum (Tip)', 
+            line=dict(color='red', width=1),
+            hovertemplate=f"Outer Radius: {ra:.2f} mm<extra></extra>"
+        ))
+        
+        # Generate and rotate teeth profiles
         for i in range(N):
             beta = (2 * np.pi * i) / N
-            
             x_rot = x_face * np.cos(beta) - y_face * np.sin(beta)
             y_rot = x_face * np.sin(beta) + y_face * np.cos(beta)
             
-            fig.add_trace(go.Scatter(x=x_rot, y=y_rot, mode='lines', line=dict(color='#1E88E5', width=1.5), showlegend=False))
+            fig.add_trace(go.Scatter(
+                x=x_rot, y=y_rot, mode='lines', 
+                line=dict(color='#1E88E5', width=1.5), 
+                showlegend=False,
+                hoverinfo='skip' # Keeps the chart clean when hovering over individual teeth faces
+            ))
         
         fig.update_layout(
             xaxis=dict(title="X Coordinate (mm)", scaleanchor="y", scaleratio=1),
