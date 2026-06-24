@@ -134,43 +134,56 @@ if execute:
             showscale=False, opacity=0.95, name="Shaft Hub Bore"
         ))
         
-        # --- 3. HIGH-FIDELITY FACE CAPS (Conforms to Tooth Profiles) ---
-        # We use a 2D mesh grid that scales the exact tooth profile down to the hub radius
-        x_outer_profile = np.array(x_pts_2d)
-        y_outer_profile = np.array(y_pts_2d)
+        # 3. Clean Face Caps (Core Disk + Tooth Extension Panels)
+        # Core solid circular disk region matrix (from r_hub to rd)
+        r_disk = np.linspace(r_hub, rd, 2)
+        X_disk = np.outer(np.cos(hub_angles), r_disk)
+        Y_disk = np.outer(np.sin(hub_angles), r_disk)
         
-        # Calculate scaling factor to bring the outer profile down to match the hub
-        # Outer profile sits roughly at the pitch/tip radius, so we scale relative to mean radius
-        r_mean_profile = np.mean(np.sqrt(x_outer_profile**2 + y_outer_profile**2))
-        scale_factor = r_hub / r_mean_profile
+        # Add main inner solid plates
+        fig_3d.add_trace(go.Surface(x=X_disk, y=Y_disk, z=np.zeros_like(X_disk), colorscale=[[0, '#1E88E5'], [1, '#1E88E5']], showscale=False, opacity=0.95, hoverinfo='skip'))
+        fig_3d.add_trace(go.Surface(x=X_disk, y=Y_disk, z=np.full_like(X_disk, b), colorscale=[[0, '#1E88E5'], [1, '#1E88E5']], showscale=False, opacity=0.95, hoverinfo='skip'))
         
-        # Create a 2D grid: 0 = at the hub, 1 = out at the full tooth tip profile
-        t_grid = np.linspace(scale_factor, 1.0, 2)
+        # Now, seal the teeth extensions individually using flat 3D polygons
+        x_outer = np.array(x_pts_2d)
+        y_outer = np.array(y_pts_2d)
         
-        X_cap = np.outer(x_outer_profile, t_grid)
-        Y_cap = np.outer(y_outer_profile, t_grid)
+        # Calculate matching base anchor points projected right onto the root circle
+        outer_angles = np.arctan2(y_outer, x_outer)
+        x_root_anchors = rd * np.cos(outer_angles)
+        y_root_anchors = rd * np.sin(outer_angles)
         
-        # Front solid cap plate (Conforms to teeth and fills completely to z = 0)
-        fig_3d.add_trace(go.Surface(
-            x=X_cap, y=Y_cap, z=np.zeros_like(X_cap),
-            colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
-            showscale=False, opacity=0.95, name="Solid Front Face",
-            hoverinfo='skip'
-        ))
+        # Build individual flat mesh panels bridging the root circle to the outer profile points
+        # For each coordinate point pair, we form a flat quadrant panel
+        for z_val in [0.0, b]:
+            x_vertices = np.concatenate([x_root_anchors, x_outer])
+            y_vertices = np.concatenate([y_root_anchors, y_outer])
+            z_vertices = np.full_like(x_vertices, z_val)
+            
+            n_p = len(x_outer)
+            i_idx, j_idx, k_idx = [], [], []
+            for idx in range(n_p - 1):
+                # Triangle 1
+                i_idx.append(idx)
+                j_idx.append(idx + 1)
+                k_idx.append(idx + n_p)
+                # Triangle 2
+                i_idx.append(idx + 1)
+                j_idx.append(idx + 1 + n_p)
+                k_idx.append(idx + n_p)
+                
+            fig_3d.add_trace(go.Mesh3d(
+                x=x_vertices, y=y_vertices, z=z_vertices,
+                i=i_idx, j=j_idx, k=k_idx,
+                color='#1E88E5', opacity=0.95, flatshading=True, showlegend=False, hoverinfo='skip'
+            ))
         
-        # Rear solid cap plate (Conforms to teeth and fills completely to z = b)
-        fig_3d.add_trace(go.Surface(
-            x=X_cap, y=Y_cap, z=np.full_like(X_cap, b),
-            colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
-            showscale=False, opacity=0.95, name="Solid Rear Face",
-            hoverinfo='skip'
-        ))
-        
-        # --- 4. SHARP BOUNDARY OUTLINE SILHOUETTES ---
-        fig_3d.add_trace(go.Scatter3d(x=x_outer_profile, y=y_outer_profile, z=np.zeros_like(x_outer_profile), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
-        fig_3d.add_trace(go.Scatter3d(x=x_outer_profile, y=y_outer_profile, z=np.full_like(x_outer_profile, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
+        # 4. Sharp Boundary Outline Silhouettes
+        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.zeros_like(x_outer), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
+        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.full_like(x_outer, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
         fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.zeros_like(hub_angles), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
         fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.full_like(hub_angles, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
+        
         fig_3d.update_layout(
             template="plotly_white",
             height=700,
