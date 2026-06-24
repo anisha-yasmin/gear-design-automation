@@ -104,9 +104,15 @@ if execute:
         y_side2 = -x_face * np.sin(theta_offset) + y_face * np.cos(theta_offset)
         x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
         
-        # Safely flatten and stack the arrays into continuous 1D coordinates
-        x_tooth_base = np.hstack([x_face, x_face.flatten(), x_side2.flatten(), x_side2[-1]])
-        y_tooth_base = np.hstack([rd, y_face.flatten(), y_side2.flatten(), rd])
+        # Ensure coordinates are perfectly flat matching 1D vectors
+        x_f = x_face.flatten()
+        y_f = y_face.flatten()
+        x_s = x_side2.flatten()
+        y_s = y_side2.flatten()
+        
+        # Build the exact continuous profile path arrays
+        x_tooth_base = np.concatenate(([x_f], x_f, x_s, [x_s[-1]]))
+        y_tooth_base = np.concatenate(([rd], y_f, y_s, [rd]))
         
         # Generate full 2D profile coordinates around the circle
         x_profile_2d = []
