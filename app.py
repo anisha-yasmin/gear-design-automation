@@ -105,8 +105,8 @@ if execute:
         x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
         
         # Single tooth outline (from root, up side 1, down side 2, back to root)
-        x_tooth_base = np.concatenate([[x_face], x_face, x_side2, [x_side2[-1]]])
-        y_tooth_base = np.concatenate([[rd], y_face, y_side2, [rd]])
+        x_tooth_base = np.hstack((x_face, x_face, x_side2, x_side2[-1]))
+        y_tooth_base = np.hstack((rd, y_face, y_side2, rd))
         
         # Generate full 2D profile coordinates around the circle
         x_profile_2d = []
