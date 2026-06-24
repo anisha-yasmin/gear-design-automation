@@ -84,33 +84,84 @@ if execute:
         st.plotly_chart(fig_2d, use_container_width=True)
         
         # --- GRAPH 2: INTERACTIVE 3D EXTRUSION ---
-        st.markdown("### 3D Parametric CAD Generation")
-        st.write("Drag to rotate, scroll to zoom. This model displays your exact face width dimensional extrusion.")
+        st.markdown("###3D Parametric CAD Generation")
+        st.write("Drag to rotate, scroll to zoom. This model displays the exact structure of the gear")
         
-        fig_3d = go.Figure()
+        m = result['Module']
+        N = int(result['Pinion Teeth (N1)'])
+        b = result['Face Width (mm)']
+        rb, rp, ra, rd = calculate_gear_parameters(m, N, 20.0)
+        x_face, y_face = generate_involute_points(rb, ra)
         
-        # Extrude reference lines to form cylinders for visualization
-        z_steps = np.array([0, b])
+        # Build unified continuous tooth profile for a single tooth
+        # Mirroring to get the second side
+        pitch_angle = (np.pi * m) / (2 * rp)
+        t_pitch = np.sqrt(max((rp / rb)**2 - 1, 0))
+        inv_pitch_angle = np.arctan(t_pitch) - t_pitch
+        theta_offset = pitch_angle - 2 * inv_pitch_angle
         
-        # Draw 3D teeth curves spanning across the full face width
+        x_side2 = x_face * np.cos(theta_offset) + y_face * np.sin(theta_offset)
+        y_side2 = -x_face * np.sin(theta_offset) + y_face * np.cos(theta_offset)
+        x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
+        
+        # Single tooth outline (from root, up side 1, down side 2, back to root)
+        x_tooth_base = np.concatenate(([x_face], x_face, x_side2, [x_side2[-1]]))
+        y_tooth_base = np.concatenate(([rd], y_face, y_side2, [rd]))
+        
+        # Generate full 2D profile coordinates around the circle
+        x_profile_2d = []
+        y_profile_2d = []
         for i in range(N):
             beta = (2 * np.pi * i) / N
-            x_rot = x_face * np.cos(beta) - y_face * np.sin(beta)
-            y_rot = x_face * np.sin(beta) + y_face * np.cos(beta)
+            x_rot = x_tooth_base * np.cos(beta) - y_tooth_base * np.sin(beta)
+            y_rot = x_tooth_base * np.sin(beta) + y_tooth_base * np.cos(beta)
+            x_profile_2d.extend(x_rot)
+            y_profile_2d.extend(y_rot)
             
-            # Create a loft/surface profile grid for 3D rendering
-            for x_val, y_val in zip(x_rot, y_rot):
-                fig_3d.add_trace(go.Scatter3d(
-                    x=[x_val, x_val], y=[y_val, y_val], z=z_steps,
-                    mode='lines', line=dict(color='#1E88E5', width=2), showlegend=False
-                ))
-                
-        # Top and bottom face circle reference meshes
-        fig_3d.add_trace(go.Scatter3d(x=ra * np.cos(angles), y=ra * np.sin(angles), z=np.zeros_like(angles), mode='lines', line=dict(color='red', width=2), name='Front Outer Face'))
-        fig_3d.add_trace(go.Scatter3d(x=ra * np.cos(angles), y=ra * np.sin(angles), z=np.full_like(angles, b), mode='lines', line=dict(color='red', width=2), name='Rear Outer Face'))
-        fig_3d.add_trace(go.Scatter3d(x=rd * np.cos(angles), y=rd * np.sin(angles), z=np.zeros_like(angles), mode='lines', line=dict(color='purple', width=1), name='Front Root Face'))
-        fig_3d.add_trace(go.Scatter3d(x=rd * np.cos(angles), y=rd * np.sin(angles), z=np.full_like(angles, b), mode='lines', line=dict(color='purple', width=1), name='Rear Root Face'))
-
+        x_profile_2d = np.array(x_profile_2d)
+        y_profile_2d = np.array(y_profile_2d)
+        num_pts = len(x_profile_2d)
+        
+        # Create 3D vertices: Front face (z=0) and Back face (z=b)
+        x_vertices = np.concatenate([x_profile_2d, x_profile_2d])
+        y_vertices = np.concatenate([y_profile_2d, y_profile_2d])
+        z_vertices = np.concatenate([np.zeros(num_pts), np.full(num_pts, b)])
+        
+        # Build the triangular mesh faces connecting front and back vertices
+        i_indices = []
+        j_indices = []
+        k_indices = []
+        
+        for idx in range(num_pts):
+            next_idx = (idx + 1) % num_pts
+            
+            # Triangle 1 connecting front point to back point
+            i_indices.append(idx)
+            j_indices.append(next_idx)
+            k_indices.append(idx + num_pts)
+            
+            # Triangle 2 completing the quad panel face
+            i_indices.append(next_idx)
+            j_indices.append(next_idx + num_pts)
+            k_indices.append(idx + num_pts)
+            
+        fig_3d = go.Figure()
+        
+        # Add the solid surface mesh
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_vertices, y=y_vertices, z=z_vertices,
+            i=i_indices, j=j_indices, k=k_indices,
+            color='#1E88E5',
+            opacity=0.9,
+            name='Solid Gear Body',
+            flatshading=True
+        ))
+        
+        # Add crisp edge outlines on front and back faces to look like clear CAD boundaries
+        angles = np.linspace(0, 2 * np.pi, 250)
+        fig_3d.add_trace(go.Scatter3d(x=x_profile_2d, y=y_profile_2d, z=np.zeros(num_pts), mode='lines', line=dict(color='black', width=2), name='Front Edge Profile'))
+        fig_3d.add_trace(go.Scatter3d(x=x_profile_2d, y=y_profile_2d, z=np.full(num_pts, b), mode='lines', line=dict(color='black', width=2), name='Rear Edge Profile'))
+        
         fig_3d.update_layout(
             template="plotly_white",
             height=700,
@@ -118,7 +169,8 @@ if execute:
                 xaxis_title="X (mm)",
                 yaxis_title="Y (mm)",
                 zaxis_title="Z (Width mm)",
-                aspectmode='data' # Keeps 1:1 scaling across dimensions so it looks proportional
+                aspectmode='data',
+                camera=dict(eye=dict(x=1.25, y=1.25, z=1.25))
             )
         )
         st.plotly_chart(fig_3d, use_container_width=True)
