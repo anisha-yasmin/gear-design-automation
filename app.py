@@ -84,8 +84,8 @@ if execute:
         st.plotly_chart(fig_2d, use_container_width=True)
         
         # --- GRAPH 2: INTERACTIVE 3D EXTRUSION ---
-        st.markdown("###3D Parametric CAD Generation")
-        st.write("Drag to rotate, scroll to zoom. This model displays the exact structure of the gear")
+        st.markdown("### 3D Parametric CAD Generation")
+        st.write("Drag to rotate, scroll to zoom. This model displays your exact face width dimensional extrusion.")
         
         m = result['Module']
         N = int(result['Pinion Teeth (N1)'])
@@ -94,7 +94,6 @@ if execute:
         x_face, y_face = generate_involute_points(rb, ra)
         
         # Build unified continuous tooth profile for a single tooth
-        # Mirroring to get the second side
         pitch_angle = (np.pi * m) / (2 * rp)
         t_pitch = np.sqrt(max((rp / rb)**2 - 1, 0))
         inv_pitch_angle = np.arctan(t_pitch) - t_pitch
@@ -102,59 +101,25 @@ if execute:
         
         x_side2 = x_face * np.cos(theta_offset) + y_face * np.sin(theta_offset)
         y_side2 = -x_face * np.sin(theta_offset) + y_face * np.cos(theta_offset)
-        x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
         
-        # Ensure coordinates are perfectly flat matching 1D vectors
-        x_f = x_face.flatten()
-        y_f = y_face.flatten()
-        x_s = x_side2.flatten()
-        y_s = y_side2.flatten()
+        # Flatten everything to 1D standard lists to ensure identical structures
+        x_f = [float(x) for x in x_face.flatten()]
+        y_f = [float(y) for y in y_face.flatten()]
+        x_s = [float(x) for x in x_side2.flatten()][::-1]
+        y_s = [float(y) for y in y_side2.flatten()][::-1]
         
-        # Build the exact continuous profile path sequentially
-        x_tooth_base = np.append(x_f, x_f)
-        x_tooth_base = np.append(x_tooth_base, x_s)
-        x_tooth_base = np.append(x_tooth_base, x_s[-1])
+        # Combine using standard list addition (Guarantees identical 1:1 array lengths)
+        x_tooth_list = [x_f] + x_f + x_s + [x_s[-1]]
+        y_tooth_list = [float(rd)] + y_f + y_s + [float(rd)]
         
-        y_tooth_base = np.append(rd, y_f)
-        y_tooth_base = np.append(y_tooth_base, y_s)
-        y_tooth_base = np.append(y_tooth_base, rd)
+        x_tooth_base = np.array(x_tooth_list, dtype=np.float64)
+        y_tooth_base = np.array(y_tooth_list, dtype=np.float64)
         
         # Generate full 2D profile coordinates around the circle
         x_profile_2d = []
         y_profile_2d = []
         for i in range(N):
             beta = (2 * np.pi * i) / N
-            x_rot = x_tooth_base * np.cos(beta) - y_tooth_base * np.sin(beta)
-            y_rot = x_tooth_base * np.sin(beta) + y_tooth_base * np.cos(beta)
-            x_profile_2d.extend(x_rot)
-            y_profile_2d.extend(y_rot)
-            
-        x_profile_2d = np.array(x_profile_2d)
-        y_profile_2d = np.array(y_profile_2d)
-        num_pts = len(x_profile_2d)
-        
-        # Create 3D vertices: Front face (z=0) and Back face (z=b)
-        x_vertices = np.concatenate([x_profile_2d, x_profile_2d])
-        y_vertices = np.concatenate([y_profile_2d, y_profile_2d])
-        z_vertices = np.concatenate([np.zeros(num_pts), np.full(num_pts, b)])
-        
-        # Build the triangular mesh faces connecting front and back vertices
-        i_indices = []
-        j_indices = []
-        k_indices = []
-        
-        for idx in range(num_pts):
-            next_idx = (idx + 1) % num_pts
-            
-            # Triangle 1 connecting front point to back point
-            i_indices.append(idx)
-            j_indices.append(next_idx)
-            k_indices.append(idx + num_pts)
-            
-            # Triangle 2 completing the quad panel face
-            i_indices.append(next_idx)
-            j_indices.append(next_idx + num_pts)
-            k_indices.append(idx + num_pts)
             
         fig_3d = go.Figure()
         
