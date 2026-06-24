@@ -84,7 +84,7 @@ if execute:
         st.plotly_chart(fig_2d, use_container_width=True)
         
         # --- GRAPH 2: INTERACTIVE 3D EXTRUSION ---
-        st.markdown("### 📦 3D Parametric CAD Generation")
+        st.markdown("### 3D Parametric CAD Generation")
         st.write("Drag to rotate, scroll to zoom. This model displays your exact face width dimensional extrusion.")
         
         m = result['Module']
@@ -113,19 +113,16 @@ if execute:
         
         fig_3d = go.Figure()
         
-        # 1. Add the solid extruded gear outer teeth skin
+        # 1. Outer Teeth Profile Skin
         fig_3d.add_trace(go.Surface(
             x=X_matrix, y=Y_matrix, z=Z_matrix,
             colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
-            showscale=False,
-            opacity=0.95,
-            name="Outer Teeth Profile"
+            showscale=False, opacity=0.95, name="Outer Teeth Profile"
         ))
         
-        # 2. Add an internal solid cylinder to represent the hub bore
-        # We will set the hub radius to safely sit right inside the root circle (e.g., 70% of rd)
+        # 2. Internal Shaft Hub Cylinder
         r_hub = rd * 0.70
-        hub_angles = np.linspace(0, 2 * np.pi, 100)
+        hub_angles = np.linspace(0, 2 * np.pi, len(x_pts_2d)) # Match array lengths exactly
         
         X_hub = np.outer(r_hub * np.cos(hub_angles), np.ones_like(z_range))
         Y_hub = np.outer(r_hub * np.sin(hub_angles), np.ones_like(z_range))
@@ -133,28 +130,63 @@ if execute:
         
         fig_3d.add_trace(go.Surface(
             x=X_hub, y=Y_hub, z=Z_hub,
-            colorscale=[[0, '#1565C0'], [1, '#1565C0']],  # Slightly darker industrial blue
-            showscale=False,
-            opacity=1.0,
-            name="Shaft Hub Bore"
+            colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
+            showscale=False, opacity=0.95, name="Shaft Hub Bore"
         ))
         
-        # 3. Add crisp edge silhouettes for both the teeth and the hub core
-        fig_3d.add_trace(go.Scatter3d(x=x_pts_2d, y=y_pts_2d, z=np.zeros_like(x_pts_2d), mode='lines', line=dict(color='black', width=2), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=x_pts_2d, y=y_pts_2d, z=np.full_like(x_pts_2d, b), mode='lines', line=dict(color='black', width=2), showlegend=False))
+        # 3. Solid Face Plate Caps (Front and Back)
+        # Combine outer profile and inner hub coordinates to build triangulation faces
+        x_outer = np.array(x_pts_2d)
+        y_outer = np.array(y_pts_2d)
+        x_inner = r_hub * np.cos(hub_angles)
+        y_inner = r_hub * np.sin(hub_angles)
         
-        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.zeros_like(hub_angles), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.full_like(hub_angles, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
+        x_cap = np.concatenate([x_outer, x_inner])
+        y_cap = np.concatenate([y_outer, y_inner])
+        
+        # Build triangle indices bridging the outer boundary to the inner ring boundary
+        n_pts = len(x_outer)
+        i_idx, j_idx, k_idx = [], [], []
+        for idx in range(n_pts):
+            next_idx = (idx + 1) % n_pts
+            
+            # Triangle 1
+            i_idx.append(idx)
+            j_idx.append(next_idx)
+            k_idx.append(idx + n_pts)
+            
+            # Triangle 2
+            i_idx.append(next_idx)
+            j_idx.append(next_idx + n_pts)
+            k_idx.append(idx + n_pts)
+            
+        # Front Face Cap (z = 0)
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_cap, y=y_cap, z=np.zeros_like(x_cap),
+            i=i_idx, j=j_idx, k=k_idx,
+            color='#1E88E5', opacity=0.95, showlegend=False, flatshading=True
+        ))
+        
+        # Rear Face Cap (z = b)
+        fig_3d.add_trace(go.Mesh3d(
+            x=x_cap, y=y_cap, z=np.full_like(x_cap, b),
+            i=i_idx, j=j_idx, k=k_idx,
+            color='#1E88E5', opacity=0.95, showlegend=False, flatshading=True
+        ))
+        
+        # 4. Sharp Boundary Outline Silhouettes
+        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.zeros_like(x_outer), mode='lines', line=dict(color='black', width=2), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.full_like(x_outer, b), mode='lines', line=dict(color='black', width=2), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=x_inner, y=y_inner, z=np.zeros_like(x_inner), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=x_inner, y=y_inner, z=np.full_like(x_inner, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
         
         fig_3d.update_layout(
             template="plotly_white",
             height=700,
             scene=dict(
-                xaxis_title="X (mm)",
-                yaxis_title="Y (mm)",
-                zaxis_title="Z (Width mm)",
+                xaxis_title="X (mm)", yaxis_title="Y (mm)", zaxis_title="Z (Width mm)",
                 aspectmode='data',
-                camera=dict(eye=dict(x=1.4, y=1.4, z=1.4))
+                camera=dict(eye=dict(x=1.3, y=1.3, z=1.3))
             )
         )
         st.plotly_chart(fig_3d, use_container_width=True)
