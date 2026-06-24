@@ -2,40 +2,28 @@ import numpy as np
 from stress_analysis import analyze_gear_stresses
 
 def optimize_gear_pair(required_ratio, input_torque_nm, material_yield_mpa=250.0):
-    """
-    Iterates through possible gear configurations to find the minimum weight design
-    that satisfies both bending and contact stress safety margins.
-    """
     safety_factor = 1.5
     allowable_stress = material_yield_mpa / safety_factor
     
     best_design = None
-    min_weight_factor = float('inf') #Proxy for mass (proportional to d^2 * b)
+    min_weight_factor = float('inf')
     
-    # Design space boundaries to iterate through
     possible_modules = [1.5, 2.0, 2.5, 3.0, 4.0, 5.0]
-    possible_pinion_teeth = range(15, 35) #Avoid interference below 15 teeth
-    possible_face_widths = range(15, 55, 5) #mm
-    
-    print("Scanning design space for optimal configuration")
+    possible_pinion_teeth = range(15, 35)
+    possible_face_widths = range(15, 55, 5)
     
     for m in possible_modules:
         for N1 in possible_pinion_teeth:
-            # Calculate required gear teeth based on target ratio
             N2 = int(round(N1 * required_ratio))
             actual_ratio = N2 / N1
             
-            # Allow minor deviation from target ratio (+/- 2%)
             if abs(actual_ratio - required_ratio) / required_ratio > 0.02:
                 continue
                 
             for b in possible_face_widths:
-                # Run physics analysis from Module 2
                 sigma_b, sigma_c = analyze_gear_stresses(input_torque_nm, m, N1, N2, b)
                 
-                # Check structural constraints
                 if sigma_b <= allowable_stress and sigma_c <= allowable_stress:
-                    # Mass is proportional to volume: V approx equals pi * r^2 * b
                     r1 = (m * N1) / 2.0
                     r2 = (m * N2) / 2.0
                     weight_factor = (r1**2 * b) + (r2**2 * b)
@@ -55,14 +43,13 @@ def optimize_gear_pair(required_ratio, input_torque_nm, material_yield_mpa=250.0
     return best_design
 
 if __name__ == "__main__":
-    # Design Constraints
     TARGET_RATIO = 2.0
-    TORQUE = 120.0 # Nm
-    STEEL_YIELD = 250.0 # MPa (e.g., Structural Steel)
+    TORQUE = 120.0
+    STEEL_YIELD = 250.0
     
     result = optimize_gear_pair(TARGET_RATIO, TORQUE, STEEL_YIELD)
     
-    print("\n Optimal Structural Design Found")
+    print("\nOptimal Structural Design Found")
     if result:
         for key, value in result.items():
             if isinstance(value, float):
@@ -70,4 +57,4 @@ if __name__ == "__main__":
             else:
                 print(f"{key}: {value}")
     else:
-        print("No valid design found within constraints. Increase module size or material specifications.")
+        print("No valid design found within constraints.")
