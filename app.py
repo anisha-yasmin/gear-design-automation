@@ -85,7 +85,7 @@ if execute:
         
         # --- GRAPH 2: INTERACTIVE 3D EXTRUSION ---
         st.markdown("### 3D Parametric CAD Generation")
-        st.write("Drag to rotate, scroll to zoom. This model displays your exact face width dimensional extrusion.")
+        st.write("Drag to rotate, scroll to zoom. This model displays the exact structure of the gear")
         
         m = result['Module']
         N = int(result['Pinion Teeth (N1)'])
@@ -121,8 +121,8 @@ if execute:
         ))
         
         # 2. Internal Shaft Hub Cylinder
-        r_hub = rd * 0.70
-        hub_angles = np.linspace(0, 2 * np.pi, len(x_pts_2d)) # Match array lengths exactly
+        r_hub = rd * 0.65
+        hub_angles = np.linspace(0, 2 * np.pi, 150)
         
         X_hub = np.outer(r_hub * np.cos(hub_angles), np.ones_like(z_range))
         Y_hub = np.outer(r_hub * np.sin(hub_angles), np.ones_like(z_range))
@@ -134,51 +134,32 @@ if execute:
             showscale=False, opacity=0.95, name="Shaft Hub Bore"
         ))
         
-        # 3. Solid Face Plate Caps (Front and Back)
-        # Combine outer profile and inner hub coordinates to build triangulation faces
-        x_outer = np.array(x_pts_2d)
-        y_outer = np.array(y_pts_2d)
-        x_inner = r_hub * np.cos(hub_angles)
-        y_inner = r_hub * np.sin(hub_angles)
+        # 3. Clean Face Caps using a Radial Grid Matrix (Prevents internal triangle crossing)
+        r_space = np.linspace(r_hub, rd, 2)
+        X_cap = np.outer(np.cos(hub_angles), r_space)
+        Y_cap = np.outer(np.sin(hub_angles), r_space)
         
-        x_cap = np.concatenate([x_outer, x_inner])
-        y_cap = np.concatenate([y_outer, y_inner])
-        
-        # Build triangle indices bridging the outer boundary to the inner ring boundary
-        n_pts = len(x_outer)
-        i_idx, j_idx, k_idx = [], [], []
-        for idx in range(n_pts):
-            next_idx = (idx + 1) % n_pts
-            
-            # Triangle 1
-            i_idx.append(idx)
-            j_idx.append(next_idx)
-            k_idx.append(idx + n_pts)
-            
-            # Triangle 2
-            i_idx.append(next_idx)
-            j_idx.append(next_idx + n_pts)
-            k_idx.append(idx + n_pts)
-            
-        # Front Face Cap (z = 0)
-        fig_3d.add_trace(go.Mesh3d(
-            x=x_cap, y=y_cap, z=np.zeros_like(x_cap),
-            i=i_idx, j=j_idx, k=k_idx,
-            color='#1E88E5', opacity=0.95, showlegend=False, flatshading=True
+        # Front solid cap plate (z = 0)
+        fig_3d.add_trace(go.Surface(
+            x=X_cap, y=Y_cap, z=np.zeros_like(X_cap),
+            colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
+            showscale=False, opacity=0.95, name="Front Face Plate"
         ))
         
-        # Rear Face Cap (z = b)
-        fig_3d.add_trace(go.Mesh3d(
-            x=x_cap, y=y_cap, z=np.full_like(x_cap, b),
-            i=i_idx, j=j_idx, k=k_idx,
-            color='#1E88E5', opacity=0.95, showlegend=False, flatshading=True
+        # Rear solid cap plate (z = b)
+        fig_3d.add_trace(go.Surface(
+            x=X_cap, y=Y_cap, z=np.full_like(X_cap, b),
+            colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
+            showscale=False, opacity=0.95, name="Rear Face Plate"
         ))
         
         # 4. Sharp Boundary Outline Silhouettes
-        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.zeros_like(x_outer), mode='lines', line=dict(color='black', width=2), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.full_like(x_outer, b), mode='lines', line=dict(color='black', width=2), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=x_inner, y=y_inner, z=np.zeros_like(x_inner), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=x_inner, y=y_inner, z=np.full_like(x_inner, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
+        x_outer = np.array(x_pts_2d)
+        y_outer = np.array(y_pts_2d)
+        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.zeros_like(x_outer), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.full_like(x_outer, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.zeros_like(hub_angles), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.full_like(hub_angles, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
         
         fig_3d.update_layout(
             template="plotly_white",
