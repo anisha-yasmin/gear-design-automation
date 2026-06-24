@@ -134,33 +134,43 @@ if execute:
             showscale=False, opacity=0.95, name="Shaft Hub Bore"
         ))
         
-        # 3. Clean Face Caps using a Radial Grid Matrix (Prevents internal triangle crossing)
-        r_space = np.linspace(r_hub, rd, 2)
-        X_cap = np.outer(np.cos(hub_angles), r_space)
-        Y_cap = np.outer(np.sin(hub_angles), r_space)
+        # --- 3. HIGH-FIDELITY FACE CAPS (Conforms to Tooth Profiles) ---
+        # We use a 2D mesh grid that scales the exact tooth profile down to the hub radius
+        x_outer_profile = np.array(x_pts_2d)
+        y_outer_profile = np.array(y_pts_2d)
         
-        # Front solid cap plate (z = 0)
+        # Calculate scaling factor to bring the outer profile down to match the hub
+        # Outer profile sits roughly at the pitch/tip radius, so we scale relative to mean radius
+        r_mean_profile = np.mean(np.sqrt(x_outer_profile**2 + y_outer_profile**2))
+        scale_factor = r_hub / r_mean_profile
+        
+        # Create a 2D grid: 0 = at the hub, 1 = out at the full tooth tip profile
+        t_grid = np.linspace(scale_factor, 1.0, 2)
+        
+        X_cap = np.outer(x_outer_profile, t_grid)
+        Y_cap = np.outer(y_outer_profile, t_grid)
+        
+        # Front solid cap plate (Conforms to teeth and fills completely to z = 0)
         fig_3d.add_trace(go.Surface(
             x=X_cap, y=Y_cap, z=np.zeros_like(X_cap),
             colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
-            showscale=False, opacity=0.95, name="Front Face Plate"
+            showscale=False, opacity=0.95, name="Solid Front Face",
+            hoverinfo='skip'
         ))
         
-        # Rear solid cap plate (z = b)
+        # Rear solid cap plate (Conforms to teeth and fills completely to z = b)
         fig_3d.add_trace(go.Surface(
             x=X_cap, y=Y_cap, z=np.full_like(X_cap, b),
             colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
-            showscale=False, opacity=0.95, name="Rear Face Plate"
+            showscale=False, opacity=0.95, name="Solid Rear Face",
+            hoverinfo='skip'
         ))
         
-        # 4. Sharp Boundary Outline Silhouettes
-        x_outer = np.array(x_pts_2d)
-        y_outer = np.array(y_pts_2d)
-        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.zeros_like(x_outer), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=x_outer, y=y_outer, z=np.full_like(x_outer, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.zeros_like(hub_angles), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
-        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.full_like(hub_angles, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
-        
+        # --- 4. SHARP BOUNDARY OUTLINE SILHOUETTES ---
+        fig_3d.add_trace(go.Scatter3d(x=x_outer_profile, y=y_outer_profile, z=np.zeros_like(x_outer_profile), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
+        fig_3d.add_trace(go.Scatter3d(x=x_outer_profile, y=y_outer_profile, z=np.full_like(x_outer_profile, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
+        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.zeros_like(hub_angles), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
+        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.full_like(hub_angles, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False, hoverinfo='skip'))
         fig_3d.update_layout(
             template="plotly_white",
             height=700,
