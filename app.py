@@ -9,7 +9,7 @@ from kinematics import optimize_gear_pair
 st.set_page_config(page_title="Gear Synthesis Suite", layout="centered")
 
 st.title("Parametric Gear Design & Optimization Suite")
-st.markdown("Automated AGMA structural optimization and multi-dimensional profile generation.")
+st.markdown("Automated AGMA structural optimization and multi-dimensional profile generation")
 st.markdown("---")
 
 st.subheader("Design Constraints")
