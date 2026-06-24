@@ -1,10 +1,13 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 import streamlit as st
 import numpy as np
 import plotly.graph_objects as go
 from src.geometry import calculate_gear_parameters, generate_involute_points
 from src.stress_analysis import analyze_gear_stresses
 from src.kinematics import optimize_gear_pair
-
 st.set_page_config(page_title="Parametric Gear Optimizer", layout="centered")
 
 st.title("Parametric Gear Design & Structural Optimizer")
