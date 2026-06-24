@@ -113,18 +113,38 @@ if execute:
         
         fig_3d = go.Figure()
         
-        # Add the solid extruded gear surface
+        # 1. Add the solid extruded gear outer teeth skin
         fig_3d.add_trace(go.Surface(
             x=X_matrix, y=Y_matrix, z=Z_matrix,
             colorscale=[[0, '#1E88E5'], [1, '#1E88E5']],
             showscale=False,
             opacity=0.95,
-            name="Solid Gear Outer Skin"
+            name="Outer Teeth Profile"
         ))
         
-        # Add crisp front and back wireframes so the silhouette looks completely sharp
+        # 2. Add an internal solid cylinder to represent the hub bore
+        # We will set the hub radius to safely sit right inside the root circle (e.g., 70% of rd)
+        r_hub = rd * 0.70
+        hub_angles = np.linspace(0, 2 * np.pi, 100)
+        
+        X_hub = np.outer(r_hub * np.cos(hub_angles), np.ones_like(z_range))
+        Y_hub = np.outer(r_hub * np.sin(hub_angles), np.ones_like(z_range))
+        Z_hub = np.outer(np.ones_like(hub_angles), z_range)
+        
+        fig_3d.add_trace(go.Surface(
+            x=X_hub, y=Y_hub, z=Z_hub,
+            colorscale=[[0, '#1565C0'], [1, '#1565C0']],  # Slightly darker industrial blue
+            showscale=False,
+            opacity=1.0,
+            name="Shaft Hub Bore"
+        ))
+        
+        # 3. Add crisp edge silhouettes for both the teeth and the hub core
         fig_3d.add_trace(go.Scatter3d(x=x_pts_2d, y=y_pts_2d, z=np.zeros_like(x_pts_2d), mode='lines', line=dict(color='black', width=2), showlegend=False))
         fig_3d.add_trace(go.Scatter3d(x=x_pts_2d, y=y_pts_2d, z=np.full_like(x_pts_2d, b), mode='lines', line=dict(color='black', width=2), showlegend=False))
+        
+        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.zeros_like(hub_angles), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
+        fig_3d.add_trace(go.Scatter3d(x=r_hub * np.cos(hub_angles), y=r_hub * np.sin(hub_angles), z=np.full_like(hub_angles, b), mode='lines', line=dict(color='black', width=1.5), showlegend=False))
         
         fig_3d.update_layout(
             template="plotly_white",
@@ -134,7 +154,7 @@ if execute:
                 yaxis_title="Y (mm)",
                 zaxis_title="Z (Width mm)",
                 aspectmode='data',
-                camera=dict(eye=dict(x=1.5, y=1.5, z=1.5))
+                camera=dict(eye=dict(x=1.4, y=1.4, z=1.4))
             )
         )
         st.plotly_chart(fig_3d, use_container_width=True)
