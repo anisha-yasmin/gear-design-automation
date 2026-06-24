@@ -104,12 +104,22 @@ if execute:
         y_side2 = -x_face * np.sin(theta_offset) + y_face * np.cos(theta_offset)
         x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
         
-        # Convert arrays to flat standard lists, combine them, then cast back to numpy
-        x_tooth_list = [x_face] + list(x_face) + list(x_side2) + [x_side2[-1]]
-        y_tooth_list = [rd] + list(y_face) + list(y_side2) + [rd]
+        # Build the tooth lists incrementally, forcing every element to be a standard float
+        x_tooth_list = [float(x_face)]
+        y_tooth_list = [float(rd)]
         
-        x_tooth_base = np.array(x_tooth_list)
-        y_tooth_base = np.array(y_tooth_list)
+        for val in x_face:
+            x_tooth_list.append(float(val))
+        for val in x_side2:
+            x_tooth_list.append(float(val))
+            
+        x_tooth_list.append(float(x_side2[-1]))
+        y_tooth_list.extend([float(v) for v in y_face])
+        y_tooth_list.extend([float(v) for v in y_side2])
+        y_tooth_list.append(float(rd))
+        
+        x_tooth_base = np.array(x_tooth_list, dtype=np.float64)
+        y_tooth_base = np.array(y_tooth_list, dtype=np.float64)
         
         # Generate full 2D profile coordinates around the circle
         x_profile_2d = []
