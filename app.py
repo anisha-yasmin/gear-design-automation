@@ -104,9 +104,12 @@ if execute:
         y_side2 = -x_face * np.sin(theta_offset) + y_face * np.cos(theta_offset)
         x_side2, y_side2 = x_side2[::-1], y_side2[::-1]
         
-        # Single tooth outline (from root, up side 1, down side 2, back to root)
-        x_tooth_base = np.hstack((x_face, x_face, x_side2, x_side2[-1]))
-        y_tooth_base = np.hstack((rd, y_face, y_side2, rd))
+        # Convert arrays to flat standard lists, combine them, then cast back to numpy
+        x_tooth_list = [x_face] + list(x_face) + list(x_side2) + [x_side2[-1]]
+        y_tooth_list = [rd] + list(y_face) + list(y_side2) + [rd]
+        
+        x_tooth_base = np.array(x_tooth_list)
+        y_tooth_base = np.array(y_tooth_list)
         
         # Generate full 2D profile coordinates around the circle
         x_profile_2d = []
