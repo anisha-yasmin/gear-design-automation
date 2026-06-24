@@ -194,6 +194,40 @@ if execute:
             )
         )
         st.plotly_chart(fig_3d, use_container_width=True)
+      
+      # --- FABRICATION & EXPORT SUITE ---
+        st.markdown("---")
+        st.subheader("Engineering Export & Manufacturing Section")
+        
+        # Format the coordinates into a clean CSV string for CNC/CAD import
+        csv_header = "Component,Reference Circle,Radius (mm),Diameter (mm)\n"
+        csv_data = (
+            f"Pinion,Addendum (Tip),{ra:.4f},{2*ra:.4f}\n"
+            f"Pinion,Pitch Circle,{rp:.4f},{2*rp:.4f}\n"
+            f"Pinion,Base Circle,{rb:.4f},{2*rb:.4f}\n"
+            f"Pinion,Dedendum (Root),{rd:.4f},{2*rd:.4f}\n"
+        )
+        full_csv = csv_header + csv_data
+        
+        col_dl1, col_dl2 = st.columns(2)
+        
+        col_dl1.download_button(
+            label="Export Metrology Data (CSV)",
+            data=full_csv,
+            file_name=f"gear_synthesis_N{N}_m{m}.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+        
+        # Add a placeholder button for CAD macro script generation
+        col_dl2.button(
+            label="Generate AutoCAD/SolidWorks Script",
+            help="Generates an automated script file to automatically loft this exact involute profile in native desktop CAD packages",
+            use_container_width=True,
+            type="secondary"
+        )
+        
+        st.caption("The exported CSV file maps raw coordinates directly into point clouds suitable for CNC gear hobbing or EDM wire-cutting profiles")
         
     else:
         st.error("Static Failure Mode Alert: Design constraints exceed allowable margins for selected material bounds.")
